@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mistral Chatbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        #chatbox {
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+        .message {
+            margin: 5px 0;
+        }
+        .user {
+            color: blue;
+        }
+        .bot {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chat with Mistral</h1>
+
+    <div id="chatbox"></div>
+
+    <form id="messageForm">
+        <input type="text" id="message" name="message" placeholder="Type your message..." required>
+        <button type="submit">Send</button>
+    </form>
+
+    <script>
+        const messageForm = document.getElementById('messageForm');
+        const chatBox = document.getElementById('chatbox');
+
+        function addMessage(text, sender) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${sender}`;
+            msgDiv.textContent = `${sender === 'user' ? 'You' : 'Mistral'}: ${text}`;
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function speak(text) {
+           const utterance = new SpeechSynthesisUtterance(text);
+           speechSynthesis.speak(utterance);
+        }
+
+        async function send_msg(msg) {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: `message=${encodeURIComponent(msg)}`
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                addMessage(data.response, 'bot');
+                speak(data.response);
+            } else {
+                addMessage("Error contacting server", 'bot');
+            }
+        }
+
+        messageForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const userMessage = messageForm.message.value.trim();
+            if (userMessage) {
+                addMessage(userMessage, 'user');
+                send_msg(userMessage);
+                messageForm.reset();
+            }
+        });
+    </script>
+</body>
+</html>
