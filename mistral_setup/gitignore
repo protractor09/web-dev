@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+newenv/
+venv/
+.env
+
+# Secrets
+.env
+
+# Uploaded files
+uploads/
+
+# IDE/editor files
+.vscode/
+*.swp
+*.swo
+*.idea/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Logs and temp
+*.log
+*.tmp
