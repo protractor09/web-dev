@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Real-time Face Detection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        
+        #webcam {
+            border: 2px solid black;
+            margin: 10px 0;
+        }
+        
+        #overlay {
+            position: absolute;
+            pointer-events: none;
+        }
+        
+        .face-box {
+            position: absolute;
+            border: 3px solid red;
+            background: rgba(255, 0, 0, 0.1);
+        }
+        
+        #status {
+            font-size: 18px;
+            margin: 10px 0;
+        }
+        
+        .controls {
+            margin: 10px 0;
+        }
+        
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 16px;
+        }
+        
+        .container {
+            position: relative;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <h1>Real-time Face Detection</h1>
+    
+    <div class="controls">
+        <button onclick="startCamera()">Start Camera</button>
+        <button onclick="stopCamera()">Stop Camera</button>
+        <button onclick="toggleDetection()">Toggle Detection</button>
+    </div>
+    
+    <div id="status">Click "Start Camera" to begin</div>
+    
+    <div class="container">
+        <video id="webcam" autoplay playsinline width="640" height="480"></video>
+        <div id="overlay"></div>
+    </div>
+    
+    <canvas id="canvas" style="display: none;"></canvas>
+    
+    <div id="info">
+        <p>Faces detected: <span id="faceCount">0</span></p>
+        <p>Detection active: <span id="detectionStatus">No</span></p>
+    </div>
+
+    <script>
+        let stream = null;
+        let detectionInterval = null;
+        let isDetecting = false;
+
+        async function startCamera() {
+            try {
+                document.getElementById('status').textContent = 'Starting camera...';
+                
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: 640, 
+                        height: 480 
+                    } 
+                });
+                
+                document.getElementById('webcam').srcObject = stream;
+                document.getElementById('status').textContent = 'Camera started. Click "Toggle Detection" to start face detection.';
+                
+            } catch (err) {
+                console.error('Camera error:', err);
+                document.getElementById('status').textContent = 'Failed to access camera. Please check permissions.';
+            }
+        }
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            
+            if (detectionInterval) {
+                clearInterval(detectionInterval);
+                detectionInterval = null;
+            }
+            
+            document.getElementById('webcam').srcObject = null;
+            document.getElementById('status').textContent = 'Camera stopped';
+            document.getElementById('overlay').innerHTML = '';
+            document.getElementById('faceCount').textContent = '0';
+            document.getElementById('detectionStatus').textContent = 'No';
+            isDetecting = false;
+        }
+
+        function toggleDetection() {
+            if (!stream) {
+                alert('Please start camera first');
+                return;
+            }
+            
+            if (isDetecting) {
+                // Stop detection
+                clearInterval(detectionInterval);
+                detectionInterval = null;
+                isDetecting = false;
+                document.getElementById('status').textContent = 'Face detection stopped';
+                document.getElementById('detectionStatus').textContent = 'No';
+                document.getElementById('overlay').innerHTML = '';
+            } else {
+                // Start detection
+                isDetecting = true;
+                document.getElementById('status').textContent = 'Face detection active';
+                document.getElementById('detectionStatus').textContent = 'Yes';
+                
+                detectionInterval = setInterval(detectFaces, 500); // Detect every 500ms
+            }
+        }
+
+        async function detectFaces() {
+            if (!stream || !isDetecting) return;
+            
+            try {
+                const video = document.getElementById('webcam');
+                const canvas = document.getElementById('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0);
+                
+                const imageData = canvas.toDataURL('image/jpeg');
+                
+                const response = await fetch('/detect', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ image: imageData })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    drawFaceBoxes(result.faces);
+                    document.getElementById('faceCount').textContent = result.count;
+                    document.getElementById('status').textContent = `Detecting faces... Found: ${result.count}`;
+                } else {
+                    console.error('Detection failed:', result.error);
+                }
+                
+            } catch (error) {
+                console.error('Detection error:', error);
+            }
+        }
+
+        function drawFaceBoxes(faces) {
+            const overlay = document.getElementById('overlay');
+            const video = document.getElementById('webcam');
+            
+            // Clear previous boxes
+            overlay.innerHTML = '';
+            
+            // Draw new boxes
+            faces.forEach(face => {
+                const box = document.createElement('div');
+                box.className = 'face-box';
+                box.style.left = face.x + 'px';
+                box.style.top = face.y + 'px';
+                box.style.width = face.width + 'px';
+                box.style.height = face.height + 'px';
+                overlay.appendChild(box);
+            });
+        }
+
+        // Auto-start camera on page load
+        window.addEventListener('load', () => {
+            startCamera();
+        });
+    </script>
+</body>
+</html>
